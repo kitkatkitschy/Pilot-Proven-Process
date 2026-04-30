@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pilot Proven Process</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Georgia, serif; background: #fff; max-width: 800px; margin: 0 auto; padding: 1rem; }
+    #wheel-view { width: 100%; }
+    #detail-view { display: none; padding: 1.5rem; background: #faf8f2; border-radius: 8px; min-height: 200px; }
+    #back { margin-bottom: 1rem; padding: 7px 16px; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; color: #fff; font-family: Georgia, serif; }
+    #dtitle { font-size: 20px; font-weight: bold; margin-bottom: 1.2rem; padding-bottom: 8px; border-bottom: 2px solid #ddd; }
+    .accountability-wrap { margin-bottom: 1.8rem; padding-bottom: 1.2rem; border-bottom: 1px solid #ddd; }
+    .accountability-label { font-size: 14px; font-weight: bold; color: #333; margin-bottom: 6px; }
+    .accountability-wrap textarea { width: 100%; height: 100px; padding: 10px; font-size: 13px; font-family: Georgia, serif; border: 1px solid #ccc; border-radius: 5px; background: #fff; resize: vertical; color: #333; }
+    .sub { margin-bottom: 1.2rem; }
+    .subname { font-size: 14px; font-weight: bold; color: #333; margin-bottom: 5px; }
+    .subitems { padding-left: 18px; list-style: disc; }
+    .subitems li { font-size: 13px; color: #555; line-height: 1.8; }
+    .noitem { font-size: 12px; color: #bbb; font-style: italic; }
+    .completion-wrap { margin-bottom: 1.5rem; padding-bottom: 1.2rem; border-bottom: 1px solid #ddd; display: flex; align-items: center; gap: 12px; }
+    .completion-wrap label { font-size: 14px; font-weight: bold; color: #333; white-space: nowrap; }
+    .completion-wrap input { flex: 1; }
+    .completion-wrap span { font-size: 13px; color: #555; min-width: 32px; }
+    canvas { width: 100%; display: block; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<div id="wheel-view"><canvas id="c" width="700" height="700"></canvas></div>
+<div id="detail-view">
+  <button id="back">← Back</button>
+  <div id="dtitle"></div>
+  <div class="completion-wrap">
+    <label>Completeness</label>
+    <input type="range" min="0" max="100" value="0" step="1" id="completion-slider">
+    <span id="completion-val">0%</span>
+  </div>
+  <div class="accountability-wrap">
+    <div class="accountability-label">Accountability</div>
+    <textarea id="accountability-box"></textarea>
+  </div>
+  <div id="dcontent"></div>
+</div>
+
+<script>
+const SEGS = [
+  {name:"Growth", color:"#4e7c3c", startDeg:-54, bullets:["• Scaling","• Expansion","• Strategy"],
+   subs:[{name:"Scaling",items:["Demand from company assessed and mapped out (fulfillment, IT, etc)"]},{name:"Expansion",items:["3 year projected sales goals","General customer and staff growth goals","Demographic data for use in creating special events"]},{name:"Strategy",items:["Staffing needs to fit 3 year projections","Demand on rest of business assessed"]}]},
+  {name:"Location\nEvaluation", color:"#c4b97a", startDeg:-18, bullets:["• Site analysis","• Demographics","• Lease"],
+   subs:[{name:"Site analysis",items:[]},{name:"Demographics",items:[]},{name:"Lease",items:[]}]},
+  {name:"Design", color:"#8c1c2e", startDeg:18, bullets:["• Layout","• Branding","• User experience"],
+   subs:[{name:"Layout",items:["Site drawings received","Design created and approved"]},{name:"Branding",items:["Reflection of regional culture included","Graphics related content needs communicated to MKT"]},{name:"User experience",items:["Initial customer experience mapped","POS, sampling, and storage taken into account"]}]},
+  {name:"Budget", color:"#c8691a", startDeg:54, bullets:["• Forecasting","• Cost control","• ROI"],
+   subs:[{name:"Forecasting",items:["Budget for build received from leadership/finance","Tool shared between Admin and Sales to track all expenses"]},{name:"Cost control",items:["Regular check ins between sales and finance to remain on track","Maintain tracking of spend as we go"]},{name:"ROI",items:["Initial setup of reporting of sales is complete before the first sale happens","Dashboard is rolled into regular metrics and reviewed weekly as part of L10"]}]},
+  {name:"Project\nManagement", color:"#4e7c3c", startDeg:90, bullets:["• Planning","• Timeline","• Coordination"],
+   subs:[{name:"Planning",items:["Project accelerator filled out by internal project manager","Store opening team identified and meeting cadence created and maintained","Communication pathways created (teams, email, meetings, etc)"]},{name:"Timeline",items:["External project manager supplies Gantt chart or equivalent","Asana project holds all details"]},{name:"Coordination",items:["Project documents maintained and tracked","Communication channels remain open"]}]},
+  {name:"Licensing &\nPermitting", color:"#c4b97a", startDeg:126, bullets:["• Permits","• Compliance","• Regulations"],
+   subs:[{name:"Permits",items:[]},{name:"Compliance",items:[]},{name:"Regulations",items:[]}]},
+  {name:"Staffing", color:"#8c1c2e", startDeg:162, bullets:["• Recruiting","• Training","• Retention"],
+   subs:[{name:"Recruiting",items:["Sales and Admin work together closely to recruit","Staffing goals set and met"]},{name:"Training",items:["Training manager disperses guides and leads trainings for new employees","Staff is rolled into ongoing training initiatives"]},{name:"Retention",items:[]}]},
+  {name:"Logistics", color:"#c8691a", startDeg:198, bullets:["• Supply chain","• Distribution","• Inventory"],
+   subs:[{name:"Supply chain",items:["Sales works with Fulfillment on initial inventory deliveries"]},{name:"Distribution",items:["Sales and Fulfillment design ongoing order cadence"]},{name:"Inventory",items:["Inventory specialist is appointed per location","Inventory levels are watched and tweaked until \"right\""]}]},
+  {name:"Marketing", color:"#4e7c3c", startDeg:234, bullets:["• Branding","• Outreach","• Campaigns"],
+   subs:[{name:"Branding",items:["Graphics related elements are ordered","Exterior signage is monitored — permitting may be required"]},{name:"Outreach",items:["Initial flyers created and sent to store for distribution","Email, social media, and texting blasts are created"]},{name:"Campaigns",items:["Email","Social media","Texting","Physical media"]}]},
+  {name:"Evaluation", color:"#c4b97a", startDeg:270, bullets:["• KPI's","• Reporting","• Feedback"],
+   subs:[{name:"KPI's",items:[]},{name:"Reporting",items:["Debrief of opening process is included in project management plan","P&Ls and Sales plans created before first year is complete"]},{name:"Feedback",items:["Successes and challenges from store manager are heard regularly"]}]}
+];
+
+const accountability = {};
+const completion = new Array(10).fill(0);
+
+const cv = document.getElementById('c');
+const c = cv.getContext('2d');
+const W=700,CX=350,CY=350,OR=330,IR=122,SLICE=36,GAP=1.2;
+
+function rad(d){ return d*Math.PI/180; }
+
+function drawSlice(s, i){
+  const a1=rad(s.startDeg+GAP), a2=rad(s.startDeg+SLICE-GAP);
+  c.beginPath();
+  c.moveTo(CX+IR*Math.cos(a1),CY+IR*Math.sin(a1));
+  c.arc(CX,CY,OR,a1,a2);
+  c.arc(CX,CY,IR,a2,a1,true);
+  c.closePath();
+  c.fillStyle=s.color;
+  c.fill();
+
+  const pct = completion[i] / 100;
+  if(pct > 0){
+    const fillR = IR + (OR - IR) * pct;
+    const grad = c.createRadialGradient(CX,CY,IR,CX,CY,OR);
+    grad.addColorStop(0, 'rgba(255,255,255,0.55)');
+    grad.addColorStop(pct*0.85, 'rgba(255,255,255,0.25)');
+    grad.addColorStop(pct, 'rgba(255,255,255,0)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    c.beginPath();
+    c.moveTo(CX+IR*Math.cos(a1),CY+IR*Math.sin(a1));
+    c.arc(CX,CY,fillR,a1,a2);
+    c.arc(CX,CY,IR,a2,a1,true);
+    c.closePath();
+    c.fillStyle=grad;
+    c.fill();
+    c.beginPath();
+    c.arc(CX,CY,fillR,a1,a2);
+    c.lineWidth=2;
+    c.strokeStyle='rgba(255,255,255,0.7)';
+    c.stroke();
+  }
+}
+
+function drawText(s){
+  const amid=rad(s.startDeg+SLICE/2);
+  const MR=(OR+IR)/2;
+  const tx=CX+MR*Math.cos(amid);
+  const ty=CY+MR*Math.sin(amid);
+  const isLight=s.color==='#c4b97a';
+  const tc=isLight?'#2e2a14':'#f4efe0';
+  const nameLines=s.name.split('\n');
+  const allLines=[...nameLines,...s.bullets];
+  const lineH=14;
+  const totalH=allLines.length*lineH+4;
+  c.textAlign='center'; c.textBaseline='middle';
+  let startY=ty-totalH/2;
+  nameLines.forEach((line,i)=>{
+    c.font='bold 12px Georgia,serif'; c.fillStyle=tc;
+    c.fillText(line,tx,startY+i*lineH+lineH/2);
+  });
+  startY+=nameLines.length*lineH+4;
+  s.bullets.forEach((line,i)=>{
+    c.font='11px Georgia,serif'; c.fillStyle=tc;
+    c.fillText(line,tx,startY+i*lineH+lineH/2);
+  });
+}
+
+let active=null;
+function draw(){
+  c.clearRect(0,0,W,W);
+  SEGS.forEach((s,i)=>drawSlice(s,i));
+  SEGS.forEach(s=>drawText(s));
+  c.beginPath(); c.arc(CX,CY,IR-5,0,2*Math.PI);
+  c.fillStyle='#f0ebe0'; c.fill();
+  ['Pilot','Proven','Process'].forEach((l,i)=>{
+    c.font='bold 17px Georgia,serif'; c.fillStyle='#3a3222';
+    c.textAlign='center'; c.textBaseline='middle';
+    c.fillText(l,CX,CY+(i-1)*21);
+  });
+}
+
+function saveAndShow(idx){
+  if(active!==null){
+    accountability[active]=document.getElementById('accountability-box').value;
+    completion[active]=parseInt(document.getElementById('completion-slider').value);
+  }
+  active=idx;
+  draw();
+  const s=SEGS[idx];
+  document.getElementById('wheel-view').style.display='none';
+  const dv=document.getElementById('detail-view');
+  dv.style.display='block';
+  dv.style.borderTop='5px solid '+s.color;
+  document.getElementById('back').style.background=s.color;
+  document.getElementById('dtitle').textContent=s.name.replace('\n',' ');
+  document.getElementById('dtitle').style.color=s.color;
+  const sl=document.getElementById('completion-slider');
+  sl.value=completion[idx];
+  document.getElementById('completion-val').textContent=completion[idx]+'%';
+  document.getElementById('accountability-box').value=accountability[idx]||'';
+  let html='';
+  s.subs.forEach(sub=>{
+    html+=`<div class="sub"><div class="subname">${sub.name}</div>`;
+    if(sub.items.length) html+=`<ul class="subitems">${sub.items.map(it=>`<li>${it}</li>`).join('')}</ul>`;
+    else html+=`<p class="noitem">No checklist items yet</p>`;
+    html+=`</div>`;
+  });
+  document.getElementById('dcontent').innerHTML=html;
+}
+
+document.getElementById('completion-slider').addEventListener('input',e=>{
+  const v=parseInt(e.target.value);
+  document.getElementById('completion-val').textContent=v+'%';
+  if(active!==null){ completion[active]=v; draw(); }
+});
+
+cv.addEventListener('click',e=>{
+  const r=cv.getBoundingClientRect(), sc=700/r.width;
+  const x=(e.clientX-r.left)*sc, y=(e.clientY-r.top)*sc;
+  const dx=x-CX, dy=y-CY, d=Math.sqrt(dx*dx+dy*dy);
+  if(d<IR||d>OR) return;
+  let ang=(Math.atan2(dy,dx)*180/Math.PI+360)%360;
+  const idx=SEGS.findIndex(s=>{
+    let start=(s.startDeg+360)%360, end=(start+SLICE)%360;
+    if(start<end) return ang>=start&&ang<end;
+    return ang>=start||ang<end;
+  });
+  if(idx<0) return;
+  saveAndShow(idx);
+});
+
+document.getElementById('back').addEventListener('click',()=>{
+  if(active!==null){
+    accountability[active]=document.getElementById('accountability-box').value;
+    completion[active]=parseInt(document.getElementById('completion-slider').value);
+  }
+  active=null;
+  document.getElementById('detail-view').style.display='none';
+  document.getElementById('wheel-view').style.display='block';
+  draw();
+});
+
+draw();
+</script>
+</body>
+</html>
