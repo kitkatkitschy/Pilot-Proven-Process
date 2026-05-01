@@ -11,7 +11,7 @@
     #detail-view { padding: 1.5rem; background: #f7f3eb; border-radius: 8px; min-height: 200px; }
     #back { margin-bottom: 1rem; padding: 7px 16px; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; color: #fff; font-family: Georgia, serif; }
     #dtitle { font-size: 20px; font-weight: bold; margin-bottom: 1.2rem; padding-bottom: 8px; border-bottom: 2px solid #ddd; }
-    .acct-overlay { position: absolute; background: rgba(255,255,255,0.08); border: none; border-radius: 4px; font-family: Georgia, serif; font-size: 11px; color: #111; resize: both; outline: none; padding: 12px 6px 4px 6px; z-index: 10; overflow: auto; min-width: 60px; min-height: 24px; }
+    .acct-overlay { position: absolute; background: rgba(255,255,255,0.08); border: none; border-radius: 4px; font-family: Georgia, serif; font-size: 11px; color: #111; resize: both; outline: none; padding: 6px; cursor: grab; z-index: 10; overflow: auto; min-width: 60px; min-height: 24px; }
     .acct-overlay::before { content: ""; display: block; position: absolute; top: 0; left: 0; right: 0; height: 10px; background: rgba(0,0,0,0.07); border-radius: 3px 3px 0 0; cursor: grab; pointer-events: none; }
     .sub { margin-bottom: 1.2rem; }
     .subname { font-size: 14px; font-weight: bold; color: #333; margin-bottom: 5px; }
@@ -45,7 +45,7 @@
   <textarea class="acct-overlay" id="acct-9" placeholder="Accountability..." style="position:absolute;left:54.71%;top:9.29%;width:15.71%;height:4.29%;"></textarea>
   <textarea class="acct-overlay" id="acct-10" placeholder="Accountability..." style="position:absolute;left:40.00%;top:56.57%;width:20.00%;height:4.57%;"></textarea>
 </div>
-<div id="detail-view">
+<div id="detail-view" style="display:none;">
   <button id="back">← Back</button>
   <div id="dtitle"></div>
   <textarea id="accountability-box" style=""></textarea>
@@ -420,62 +420,95 @@ document.getElementById('completion-slider').addEventListener('input',e=>{
 
 // Drag logic for overlay boxes
 function makeDraggable(el) {
-  let startX, startY, startLeft, startTop, dragging = false;
+  let startMouseX, startMouseY, startElLeft, startElTop;
+  let dragging = false, moved = false, editing = false;
+
+  el.readOnly = true;
+  el.style.cursor = 'grab';
+
+  el.addEventListener('dblclick', function() {
+    editing = true;
+    el.readOnly = false;
+    el.style.cursor = 'text';
+    el.focus();
+  });
+
+  el.addEventListener('blur', function() {
+    editing = false;
+    el.readOnly = true;
+    el.style.cursor = 'grab';
+    persistState();
+  });
 
   el.addEventListener('mousedown', function(e) {
-    // Only drag from top 12px strip (acts as drag handle)
-    const rect = el.getBoundingClientRect();
-    if (e.clientY - rect.top > 12) return;
+    if (editing) return;
     e.preventDefault();
     dragging = true;
-    startX = e.clientX;
-    startY = e.clientY;
-    startLeft = parseInt(el.style.left) || 0;
-    startTop  = parseInt(el.style.top)  || 0;
+    moved = false;
+
+    // Convert current position to px relative to parent for consistent math
+    const parent = el.parentElement.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    startElLeft = elRect.left - parent.left;
+    startElTop  = elRect.top  - parent.top;
+    startMouseX = e.clientX;
+    startMouseY = e.clientY;
+
+    // Switch to px so drag math is simple
+    el.style.left = startElLeft + 'px';
+    el.style.top  = startElTop  + 'px';
     el.style.cursor = 'grabbing';
     el.style.opacity = '0.85';
   });
 
   document.addEventListener('mousemove', function(e) {
     if (!dragging) return;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    el.style.left = (startLeft + dx) + 'px';
-    el.style.top  = (startTop  + dy) + 'px';
+    const dx = e.clientX - startMouseX;
+    const dy = e.clientY - startMouseY;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true;
+    el.style.left = (startElLeft + dx) + 'px';
+    el.style.top  = (startElTop  + dy) + 'px';
   });
 
   document.addEventListener('mouseup', function() {
     if (!dragging) return;
     dragging = false;
-    el.style.cursor = '';
+    el.style.cursor = 'grab';
     el.style.opacity = '';
-    persistState();
+    if (moved) persistState();
   });
 
   // Touch support
   el.addEventListener('touchstart', function(e) {
-    const rect = el.getBoundingClientRect();
-    const touch = e.touches[0];
-    if (touch.clientY - rect.top > 12) return;
+    if (editing) return;
     e.preventDefault();
     dragging = true;
-    startX = touch.clientX;
-    startY = touch.clientY;
-    startLeft = parseInt(el.style.left) || 0;
-    startTop  = parseInt(el.style.top)  || 0;
+    moved = false;
+    const touch = e.touches[0];
+    const parent = el.parentElement.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    startElLeft = elRect.left - parent.left;
+    startElTop  = elRect.top  - parent.top;
+    startMouseX = touch.clientX;
+    startMouseY = touch.clientY;
+    el.style.left = startElLeft + 'px';
+    el.style.top  = startElTop  + 'px';
   }, {passive: false});
 
   document.addEventListener('touchmove', function(e) {
     if (!dragging) return;
     const touch = e.touches[0];
-    el.style.left = (startLeft + touch.clientX - startX) + 'px';
-    el.style.top  = (startTop  + touch.clientY - startY) + 'px';
+    const dx = touch.clientX - startMouseX;
+    const dy = touch.clientY - startMouseY;
+    moved = true;
+    el.style.left = (startElLeft + dx) + 'px';
+    el.style.top  = (startElTop  + dy) + 'px';
   });
 
   document.addEventListener('touchend', function() {
     if (!dragging) return;
     dragging = false;
-    persistState();
+    if (moved) persistState();
   });
 }
 
