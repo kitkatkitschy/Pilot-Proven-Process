@@ -92,7 +92,7 @@ const SEGS = [
 
 // Center tile definition — index 10
 const CENTER = {
-  name: "Birmingham\nProven Process",
+  name: "Pilot\nProven Process",
   sectionTitle: "Facilitation",
   color: "#3a3222",
   subs: [
@@ -124,7 +124,7 @@ const CENTER = {
 // Load persisted state from localStorage or initialize fresh
 function loadState() {
   try {
-    const saved = localStorage.getItem('ppp_state');
+    const saved = localStorage.getItem('ppp_state_pilot');
     if (saved) return JSON.parse(saved);
   } catch(e) {}
   return null;
@@ -136,7 +136,7 @@ const completion = _saved ? _saved.completion : new Array(11).fill(0);
 
 function persistState() {
   try {
-    localStorage.setItem('ppp_state', JSON.stringify({ accountability, notes, completion }));
+    localStorage.setItem('ppp_state_pilot', JSON.stringify({ accountability, notes, completion }));
   } catch(e) {}
 }
 
@@ -223,18 +223,38 @@ function drawCenter(){
   c.fillStyle='#f5f0e8';
   c.fill();
 
-  // Completion fill for center (index 10)
+  // Completion fill for center — fills bottom to top
   const pct = completion[10] / 100;
   if(pct > 0){
-    const grad = c.createRadialGradient(CX,CY,0,CX,CY,innerR);
-    grad.addColorStop(0, 'rgba(255,255,255,0.6)');
-    grad.addColorStop(pct*0.8, 'rgba(255,255,255,0.25)');
-    grad.addColorStop(pct, 'rgba(255,255,255,0)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    // The filled band: from bottom of circle up by pct
+    const topY = CY + innerR;           // bottom of circle (y increases downward)
+    const fillHeight = 2 * innerR * pct;
+    const fillTopY = topY - fillHeight; // top edge of the filled region
+
+    // Clip to the circle so fill doesn't bleed outside
+    c.save();
     c.beginPath();
-    c.arc(CX,CY,innerR,0,2*Math.PI);
-    c.fillStyle=grad;
-    c.fill();
+    c.arc(CX, CY, innerR, 0, 2 * Math.PI);
+    c.clip();
+
+    // Linear gradient fading upward (matches slice shading feel)
+    const grad = c.createLinearGradient(CX, topY, CX, fillTopY);
+    grad.addColorStop(0,    'rgba(120,120,120,0.55)');
+    grad.addColorStop(0.6,  'rgba(120,120,120,0.25)');
+    grad.addColorStop(1,    'rgba(120,120,120,0.05)');
+
+    c.fillStyle = grad;
+    c.fillRect(CX - innerR, fillTopY, innerR * 2, fillHeight);
+
+    // Horizontal line at the fill level (matches the arc stroke on slices)
+    c.beginPath();
+    c.moveTo(CX - innerR, fillTopY);
+    c.lineTo(CX + innerR, fillTopY);
+    c.lineWidth = 2;
+    c.strokeStyle = 'rgba(255,255,255,0.7)';
+    c.stroke();
+
+    c.restore();
   }
 
   // Subtle inner ring border
