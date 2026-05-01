@@ -8,12 +8,11 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: Georgia, serif; background: #fff; max-width: 800px; margin: 0 auto; padding: 1rem; }
     #wheel-view { width: 100%; }
-    #detail-view { display: none; padding: 1.5rem; background: #f7f3eb; border-radius: 8px; min-height: 200px; }
+    #detail-view { padding: 1.5rem; background: #f7f3eb; border-radius: 8px; min-height: 200px; }
     #back { margin-bottom: 1rem; padding: 7px 16px; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; color: #fff; font-family: Georgia, serif; }
     #dtitle { font-size: 20px; font-weight: bold; margin-bottom: 1.2rem; padding-bottom: 8px; border-bottom: 2px solid #ddd; }
-    .accountability-wrap { margin-bottom: 1.8rem; padding-bottom: 1.2rem; border-bottom: 1px solid #ddd; }
-    .accountability-label { font-size: 17px; font-weight: bold; color: #333; margin-bottom: 6px; text-align: center; }
-    .accountability-wrap textarea { width: 100%; height: 60px; padding: 8px 10px; font-size: 13px; font-family: Georgia, serif; border: 1px solid #ccc; border-radius: 5px; background: #fff; resize: vertical; color: #333; }
+    .acct-overlay { position: absolute; background: rgba(255,255,255,0.08); border: none; border-radius: 4px; font-family: Georgia, serif; font-size: 11px; color: #111; resize: both; outline: none; padding: 12px 6px 4px 6px; z-index: 10; overflow: auto; min-width: 60px; min-height: 24px; }
+    .acct-overlay::before { content: ""; display: block; position: absolute; top: 0; left: 0; right: 0; height: 10px; background: rgba(0,0,0,0.07); border-radius: 3px 3px 0 0; cursor: grab; pointer-events: none; }
     .sub { margin-bottom: 1.2rem; }
     .subname { font-size: 14px; font-weight: bold; color: #333; margin-bottom: 5px; }
     .subitems { padding-left: 18px; list-style: disc; }
@@ -32,14 +31,24 @@
 </head>
 <body>
 
-<div id="wheel-view"><canvas id="c" width="700" height="700"></canvas></div>
+<div id="wheel-view" style="position:relative;">
+  <canvas id="c" width="700" height="700"></canvas>
+  <textarea class="acct-overlay" id="acct-0" placeholder="Accountability..." style="position:absolute;left:73.00%;top:25.43%;width:15.71%;height:4.29%;"></textarea>
+  <textarea class="acct-overlay" id="acct-1" placeholder="Accountability..." style="position:absolute;left:80.43%;top:47.86%;width:15.71%;height:4.29%;"></textarea>
+  <textarea class="acct-overlay" id="acct-2" placeholder="Accountability..." style="position:absolute;left:73.00%;top:70.29%;width:15.71%;height:4.29%;"></textarea>
+  <textarea class="acct-overlay" id="acct-3" placeholder="Accountability..." style="position:absolute;left:54.71%;top:86.43%;width:15.71%;height:4.29%;"></textarea>
+  <textarea class="acct-overlay" id="acct-4" placeholder="Accountability..." style="position:absolute;left:29.57%;top:86.43%;width:15.71%;height:4.29%;"></textarea>
+  <textarea class="acct-overlay" id="acct-5" placeholder="Accountability..." style="position:absolute;left:11.29%;top:70.29%;width:15.71%;height:4.29%;"></textarea>
+  <textarea class="acct-overlay" id="acct-6" placeholder="Accountability..." style="position:absolute;left:3.86%;top:47.86%;width:15.71%;height:4.29%;"></textarea>
+  <textarea class="acct-overlay" id="acct-7" placeholder="Accountability..." style="position:absolute;left:11.29%;top:25.43%;width:15.71%;height:4.29%;"></textarea>
+  <textarea class="acct-overlay" id="acct-8" placeholder="Accountability..." style="position:absolute;left:29.57%;top:9.29%;width:15.71%;height:4.29%;"></textarea>
+  <textarea class="acct-overlay" id="acct-9" placeholder="Accountability..." style="position:absolute;left:54.71%;top:9.29%;width:15.71%;height:4.29%;"></textarea>
+  <textarea class="acct-overlay" id="acct-10" placeholder="Accountability..." style="position:absolute;left:40.00%;top:56.57%;width:20.00%;height:4.57%;"></textarea>
+</div>
 <div id="detail-view">
   <button id="back">← Back</button>
   <div id="dtitle"></div>
-  <div class="accountability-wrap">
-    <div class="accountability-label">Accountability</div>
-    <textarea id="accountability-box"></textarea>
-  </div>
+  <textarea id="accountability-box" style=""></textarea>
   <div id="dcontent"></div>
   <div class="notes-wrap">
     <div class="notes-label">Notes</div>
@@ -133,10 +142,16 @@ const _saved = loadState();
 const accountability = _saved ? _saved.accountability : {};
 const notes = _saved ? _saved.notes : {};
 const completion = _saved ? _saved.completion : new Array(11).fill(0);
+let _savedLayout = _saved ? _saved.overlayLayout : null;
 
 function persistState() {
   try {
-    localStorage.setItem('ppp_state_pilot', JSON.stringify({ accountability, notes, completion }));
+    const layout = getOverlayLayout();
+    _savedLayout = layout;
+    localStorage.setItem('ppp_state_pilot', JSON.stringify({
+      accountability, notes, completion,
+      overlayLayout: layout
+    }));
   } catch(e) {}
 }
 
@@ -145,6 +160,52 @@ const c = cv.getContext('2d');
 const W=700,CX=350,CY=350,OR=330,IR=122,SLICE=36,GAP=1.2;
 
 function rad(d){ return d*Math.PI/180; }
+
+// Hardcoded outer-rim positions for each slice box (indexed 0-9)
+// All corners verified inside wheel (OR=330), clear of label text
+const SLICE_BOXES = [
+  {x:478, y:149, w:110, h:28},  // 0 Growth
+  {x:563, y:335, w:110, h:30},  // 1 Location Eval
+  {x:511, y:492, w:110, h:30},  // 2 Design
+  {x:383, y:605, w:110, h:30},  // 3 Budget
+  {x:207, y:605, w:110, h:30},  // 4 Project Mgmt
+  {x:79,  y:492, w:110, h:30},  // 5 Licensing
+  {x:27,  y:335, w:110, h:30},  // 6 Staffing
+  {x:79,  y:178, w:110, h:30},  // 7 Logistics IT
+  {x:207, y:65,  w:110, h:30},  // 8 Marketing
+  {x:383, y:65,  w:110, h:30},  // 9 Evaluation
+];
+
+function getSliceBBox(s) {
+  const idx = SEGS.indexOf(s);
+  return SLICE_BOXES[idx] || SLICE_BOXES[0];
+}
+
+function getCenterBBox() {
+  // Place below the logo/text in the lower part of the center circle
+  const w = 140, h = 32;
+  return { x: CX - w/2, y: CY + 52, w, h };
+}
+
+function positionAllOverlays() {
+  const PCTS = [
+    [73.00,25.43,15.71,4.29],[80.43,47.86,15.71,4.29],[73.00,70.29,15.71,4.29],
+    [54.71,86.43,15.71,4.29],[29.57,86.43,15.71,4.29],[11.29,70.29,15.71,4.29],
+    [3.86,47.86,15.71,4.29],[11.29,25.43,15.71,4.29],[29.57,9.29,15.71,4.29],
+    [54.71,9.29,15.71,4.29],[40.00,56.57,20.00,4.57]
+  ];
+  for(let i=0;i<=10;i++){
+    const ov=document.getElementById('acct-'+i);
+    if(!ov) continue;
+    const [l,t,w,h]=PCTS[i];
+    ov.style.left=l+'%'; ov.style.top=t+'%';
+    ov.style.width=w+'%'; ov.style.height=h+'%';
+  }
+}
+
+function hideAllOverlays() {
+  // No-op: overlays live inside wheel-view div which hides as a whole
+}
 
 function drawSlice(s, i){
   const a1=rad(s.startDeg+GAP), a2=rad(s.startDeg+SLICE-GAP);
@@ -294,9 +355,16 @@ function draw(){
   drawCenter();
 }
 
+function saveAllOverlayInputs(){
+  for(let i=0;i<=10;i++){
+    const ov=document.getElementById('acct-'+i);
+    if(ov) accountability[i]=ov.value;
+  }
+}
+
 function saveActive(){
+  saveAllOverlayInputs();
   if(active!==null){
-    accountability[active]=document.getElementById('accountability-box').value;
     notes[active]=document.getElementById('notes-box').value;
     completion[active]=parseInt(document.getElementById('completion-slider').value);
     persistState();
@@ -321,7 +389,6 @@ function showDetail(idx, seg, titleOverride){
   const sl=document.getElementById('completion-slider');
   sl.value=completion[idx];
   document.getElementById('completion-val').textContent=completion[idx]+'%';
-  document.getElementById('accountability-box').value=accountability[idx]||'';
   document.getElementById('notes-box').value=notes[idx]||'';
 
   let html='';
@@ -351,9 +418,86 @@ document.getElementById('completion-slider').addEventListener('input',e=>{
   if(active!==null){ completion[active]=v; draw(); persistState(); }
 });
 
-document.getElementById('accountability-box').addEventListener('input',()=>{
-  if(active!==null){ accountability[active]=document.getElementById('accountability-box').value; persistState(); }
-});
+// Drag logic for overlay boxes
+function makeDraggable(el) {
+  let startX, startY, startLeft, startTop, dragging = false;
+
+  el.addEventListener('mousedown', function(e) {
+    // Only drag from top 12px strip (acts as drag handle)
+    const rect = el.getBoundingClientRect();
+    if (e.clientY - rect.top > 12) return;
+    e.preventDefault();
+    dragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    startLeft = parseInt(el.style.left) || 0;
+    startTop  = parseInt(el.style.top)  || 0;
+    el.style.cursor = 'grabbing';
+    el.style.opacity = '0.85';
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    el.style.left = (startLeft + dx) + 'px';
+    el.style.top  = (startTop  + dy) + 'px';
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (!dragging) return;
+    dragging = false;
+    el.style.cursor = '';
+    el.style.opacity = '';
+    persistState();
+  });
+
+  // Touch support
+  el.addEventListener('touchstart', function(e) {
+    const rect = el.getBoundingClientRect();
+    const touch = e.touches[0];
+    if (touch.clientY - rect.top > 12) return;
+    e.preventDefault();
+    dragging = true;
+    startX = touch.clientX;
+    startY = touch.clientY;
+    startLeft = parseInt(el.style.left) || 0;
+    startTop  = parseInt(el.style.top)  || 0;
+  }, {passive: false});
+
+  document.addEventListener('touchmove', function(e) {
+    if (!dragging) return;
+    const touch = e.touches[0];
+    el.style.left = (startLeft + touch.clientX - startX) + 'px';
+    el.style.top  = (startTop  + touch.clientY - startY) + 'px';
+  });
+
+  document.addEventListener('touchend', function() {
+    if (!dragging) return;
+    dragging = false;
+    persistState();
+  });
+}
+
+// Save size on resize end (resize observer)
+function watchResize(el) {
+  let rto;
+  new ResizeObserver(() => {
+    clearTimeout(rto);
+    rto = setTimeout(() => persistState(), 300);
+  }).observe(el);
+}
+
+// Wire up live-save for all 11 accountability overlays
+for(let _i=0;_i<=10;_i++){
+  (function(idx){
+    const ov=document.getElementById('acct-'+idx);
+    if(ov) ov.addEventListener('input',()=>{
+      accountability[idx]=ov.value;
+      persistState();
+    });
+  })(_i);
+}
 
 document.getElementById('notes-box').addEventListener('input',()=>{
   if(active!==null){ notes[active]=document.getElementById('notes-box').value; persistState(); }
@@ -387,10 +531,40 @@ document.getElementById('back').addEventListener('click',()=>{
   active=null;
   document.getElementById('detail-view').style.display='none';
   document.getElementById('wheel-view').style.display='block';
+  // Reload overlay values from accountability store
+  for(let i=0;i<=10;i++){
+    const ov=document.getElementById('acct-'+i);
+    if(ov) ov.value=accountability[i]||'';
+  }
   draw();
 });
 
+// Populate overlay textareas from saved state and attach drag/resize
+for(let i=0;i<=10;i++){
+  const ov=document.getElementById('acct-'+i);
+  if(ov) {
+    ov.value=accountability[i]||'';
+    makeDraggable(ov);
+    watchResize(ov);
+  }
+}
 draw();
+
+// Use window.onload to guarantee canvas is fully laid out before positioning overlays
+window.addEventListener('load', ()=>{
+  if(_savedLayout){
+    applyOverlayLayout(_savedLayout);
+  } else {
+    positionAllOverlays();
+  }
+});
+
+// Reposition on window resize
+window.addEventListener('resize', ()=>{
+  if(document.getElementById('wheel-view').style.display !== 'none') {
+    positionAllOverlays();
+  }
+});
 </script>
 </body>
 </html>
